@@ -2,7 +2,7 @@
 
 A [Claude Code](https://docs.anthropic.com/en/docs/claude-code) skill that generates AI-narrated video tutorials from GitHub repositories.
 
-Paste a repo URL, get a 1080p MP4 with syntax-highlighted code walkthroughs, architecture diagrams, and spoken narration.
+Paste a repo URL, get a 1080p MP4 with syntax-highlighted code walkthroughs, architecture diagrams, and spoken narration. **No API keys required** — Claude does the analysis and scripting, Edge TTS (free) handles narration.
 
 ## Installation
 
@@ -27,11 +27,8 @@ ln -s ~/repo2video-skill/repo2video .claude/skills/repo2video
 - **Node.js** >= 18
 - **FFmpeg** (with libmp3lame) — `brew install ffmpeg` / `apt install ffmpeg`
 - **Git**
-- **OpenRouter API key** — get one at [openrouter.ai/keys](https://openrouter.ai/keys)
 
-```bash
-export OPENROUTER_API_KEY=your-key-here
-```
+That's it. No API keys needed.
 
 Optional:
 - `ELEVENLABS_API_KEY` — for premium TTS voices (falls back to free Edge TTS)
@@ -50,16 +47,17 @@ Or describe what you want:
 Create a 3-minute video tutorial for https://github.com/expressjs/express
 ```
 
-## What it does
+## How it works
 
-The skill runs a 6-stage pipeline:
+Unlike typical AI video tools, **Claude itself** does the creative work:
 
 1. **Clone** — shallow clone of the target repo
-2. **Analyze** — detect languages, frameworks, entry points, key files
-3. **Plan** — LLM generates tutorial section structure
-4. **Script** — LLM writes narration + code block references per section
-5. **Audio** — TTS generates spoken narration (ElevenLabs → Edge TTS → silence fallback)
-6. **Render** — Remotion renders animated React scenes to 1080p MP4 with FFmpeg audio mux
+2. **Analyze** — engine detects languages, frameworks, entry points, key files
+3. **Read** — Claude reads key source files to deeply understand the codebase
+4. **Plan** — Claude designs the tutorial structure (sections, pacing, teaching order)
+5. **Script** — Claude writes narration + code annotations for each section
+6. **Audio** — Edge TTS generates spoken narration (free, no API key)
+7. **Render** — Remotion renders animated React scenes to 1080p MP4 with FFmpeg audio mux
 
 Output: a polished MP4 video tutorial with:
 - Animated intro with repo name and detected frameworks
@@ -73,15 +71,17 @@ Output: a polished MP4 video tutorial with:
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `OPENROUTER_API_KEY` | Yes | LLM access via OpenRouter |
-| `OPENROUTER_MODEL` | No | Defaults to `google/gemini-2.0-flash-001` |
-| `ELEVENLABS_API_KEY` | No | Premium TTS (falls back to Edge TTS) |
+| `ELEVENLABS_API_KEY` | No | Premium TTS (falls back to free Edge TTS) |
 | `ELEVENLABS_VOICE_ID` | No | Defaults to `JBFqnCBsd6RMkjVDRZzb` |
 | `EDGE_TTS_VOICE` | No | Defaults to `en-US-GuyNeural` |
 
-## How it works
+## Architecture
 
 The video rendering engine lives at [kuncevichandrew2/repotutor](https://github.com/kuncevichandrew2/repotutor). On first use, the skill clones it to `~/.repo2video` and installs dependencies. Subsequent runs reuse the cached installation.
+
+The skill splits work between Claude and the engine:
+- **Claude** — analyzes code, plans tutorial structure, writes narration scripts
+- **Engine** — generates TTS audio, renders animated video with Remotion/FFmpeg
 
 Videos are rendered using [Remotion](https://remotion.dev) (React-to-video) with a fallback to pure FFmpeg if Remotion fails.
 
