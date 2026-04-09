@@ -2,7 +2,7 @@
 name: repo2video
 description: >
   Generate AI-narrated video tutorials from GitHub repositories.
-  You (Claude) analyze the repo, plan the tutorial, and write narration scripts.
+  You (Claude) analyze the repo, plan the tutorial, and write narration scripts with slides.
   The rendering engine handles TTS and video. No API keys required.
   Trigger: user asks to create a video tutorial from a repo, or types /repo2video.
 allowed-tools:
@@ -16,7 +16,9 @@ allowed-tools:
 
 # repo2video
 
-Generate an AI-narrated video tutorial from any GitHub repository. **You** (Claude) do the creative work — analyzing code, planning the tutorial structure, and writing narration scripts. The rendering engine handles TTS audio and video rendering. No external API keys are required.
+Generate an AI-narrated video tutorial from any GitHub repository. **You** (Claude) do the creative work — analyzing code, planning the tutorial structure, writing slide content, and scripting narration. The rendering engine handles TTS audio and video rendering. No external API keys are required.
+
+**Key principle: Architecture first, code second.** Every video should start by explaining *what* the project does and *how* it's structured before diving into any code. Use slides and diagrams to build understanding progressively.
 
 ## Step 1: Parse the user's request
 
@@ -81,19 +83,29 @@ cat /tmp/repo2video-analysis.json
 
 The analysis JSON contains: `repoName`, `description`, `primaryLanguage`, `languages`, `frameworks`, `entryPoints`, `fileTree`, `keyFiles` (with content), `dependencies`, `totalFiles`, `totalLines`.
 
-## Step 5: Read key files from the cloned repo
+## Step 5: Deep-read the codebase
 
 Based on the analysis, read the most important source files to deeply understand the codebase. Use the Read tool to examine:
 - Entry points identified in the analysis
 - Core modules and key architectural files
-- Configuration files (package.json, Cargo.toml, etc.)
+- Configuration files (package.json, Cargo.toml, pyproject.toml, etc.)
 - README.md for project context
 
-Read at least 5-10 key files. You need to understand the code well enough to explain it in a tutorial.
+Read at least 5-10 key files. You need to understand the code well enough to:
+1. Explain the high-level architecture with diagrams
+2. Describe each component's role and how they connect
+3. Walk through the most important code paths
 
-## Step 6: Plan the tutorial
+## Step 6: Plan the tutorial (architecture-first)
 
-Based on your analysis, create a tutorial plan. Calculate the number of sections:
+Design the tutorial structure. The video MUST follow this pattern:
+
+1. **Overview slide** — What the project is, who it's for, what problem it solves
+2. **Architecture slide(s)** — How the project is structured, component relationships, data flow (with Mermaid diagram)
+3. **Code walkthroughs** — Deep dive into key files, in dependency order
+4. **Summary slide** — How everything connects, how to get started
+
+Calculate sections:
 - `totalSections = max(3, min(10, ceil(targetMinutes * 1.5)))`
 - Each section gets `targetDurationSec = round((targetMinutes * 60) / totalSections)`
 
@@ -115,54 +127,100 @@ Write the plan as JSON to `/tmp/repo2video-plan.json`:
 }
 ```
 
-Rules for planning:
-1. Start with a high-level **overview** section (what the project does, who it's for)
-2. Second section should be **architecture** (project structure, how components connect)
-3. Walk through code in dependency order — foundations before features
-4. Highlight the most important files (up to 8)
-5. End with a **summary** section (how everything connects, how to contribute)
-6. ONLY reference file paths that exist in the analysis `keyFiles`
-7. Use section types: `overview`, `architecture`, `code_walkthrough`, `summary`
+Rules:
+1. At least the first 2 sections MUST be `overview` or `architecture` type (slides, not code)
+2. Walk through code in dependency order — foundations before features
+3. ONLY reference file paths that exist in the analysis `keyFiles`
+4. End with a `summary` section
 
-## Step 7: Write narration scripts
+## Step 7: Write narration scripts with slides
 
-For each section in the plan, write a narration script. Write ALL scripts as a JSON array to `/tmp/repo2video-scripts.json`:
+For each section, write a script. **Slide sections** (overview, architecture, summary) get a `slides` object with bullets and description. **Code sections** get code blocks with comment hints.
+
+Write ALL scripts as a JSON array to `/tmp/repo2video-scripts.json`:
+
+### Slide section example (overview, architecture, summary):
 
 ```json
-[
-  {
-    "sectionId": "matches section.id from plan",
-    "narration": "Full narration text, conversational but technical...",
-    "codeBlocks": [
-      {
-        "filePath": "src/index.ts",
-        "startLine": 1,
-        "endLine": 45,
-        "focusStart": 10,
-        "commentHints": [
-          { "insertAfterLine": 5, "comment": "`createApp` initializes the Express server" },
-          { "insertAfterLine": 12, "comment": "Middleware chain: auth → rate-limit → handler" }
-        ],
-        "revealOrder": 1
-      }
-    ],
-    "mermaidDiagram": "graph TD\n  A[Client] -->|HTTP| B[Server]\n  B --> C[DB]",
-    "estimatedDurationSec": 40
-  }
-]
+{
+  "sectionId": "overview",
+  "narration": "Full narration text spoken during this slide...",
+  "slides": {
+    "description": "Optional subtitle or context line shown below the title",
+    "bullets": [
+      "First key point about the project",
+      "Second point — use `backticks` for code terms",
+      "Third point explaining a concept"
+    ]
+  },
+  "codeBlocks": [],
+  "estimatedDurationSec": 40
+}
 ```
 
-Rules for scripting:
+### Architecture section example (with diagram + optional slide):
+
+```json
+{
+  "sectionId": "architecture",
+  "narration": "Narration explaining the architecture...",
+  "slides": {
+    "description": "How the components fit together",
+    "bullets": [
+      "`ComponentA` handles user requests and routing",
+      "`ComponentB` manages data persistence",
+      "Events flow from A → B → C via message queue"
+    ]
+  },
+  "mermaidDiagram": "graph TD\n  A[Client] -->|HTTP| B[API Server]\n  B --> C[Database]\n  B --> D[Cache]",
+  "codeBlocks": [],
+  "estimatedDurationSec": 40
+}
+```
+
+### Code walkthrough example:
+
+```json
+{
+  "sectionId": "auth-module",
+  "narration": "Narration explaining the code...",
+  "codeBlocks": [
+    {
+      "filePath": "src/auth.ts",
+      "startLine": 1,
+      "endLine": 45,
+      "focusStart": 10,
+      "commentHints": [
+        { "insertAfterLine": 5, "comment": "`createApp` initializes the Express server" },
+        { "insertAfterLine": 12, "comment": "Middleware chain: auth → rate-limit → handler" }
+      ],
+      "revealOrder": 1
+    }
+  ],
+  "estimatedDurationSec": 40
+}
+```
+
+### Rules for slides:
+1. **3-6 bullets per slide** — concise, scannable points
+2. Use `backticks` around code terms (function names, variables, file names) — they render in accent color
+3. **Description** is optional — use for a one-line context setter below the title
+4. Bullets animate in one by one, so structure them as a progressive reveal of understanding
+5. Keep bullets under 80 characters each
+
+### Rules for code blocks:
+1. Use generous line ranges (30-60 lines) for context
+2. Set `focusStart` to the most interesting line
+3. **Comment hints**: 6-12 per block, every 3-5 lines — these create pause points in the typing animation
+4. Wrap variable/function names in backticks in comment hints
+5. Narration must follow code order (top-to-bottom)
+
+### General rules:
 1. **Narration tone**: Conversational but technical, like a senior engineer explaining to a new team member
-2. **Explain WHY** the code is structured this way, not just what each line does
-3. **Code blocks**: Use generous line ranges (30-60 lines) for context. Set `focusStart` to the most interesting line
-4. **Comment hints**: 6-12 per code block, every 3-5 lines. These create PAUSE POINTS in the video where the narrator explains what just appeared. Write them as short teaching comments (max 80 chars). Wrap variable/function names in backticks
-5. **Narration must follow code order**: The spoken narration should match the top-to-bottom reveal of code and comment hints
-6. **Word count**: Target ~2.5 words per second of narration (e.g., 40 sec section = ~100 words)
-7. **Mermaid diagram**: REQUIRED for `architecture` sections. Use `graph TD` or `graph LR`, 5-10 nodes max. Just the diagram syntax, no markdown fences
-8. **Overview section**: Start with a warm welcome and project overview
-9. **Summary section**: End with how everything connects and encouragement to explore
-10. **Transitions**: Each section should transition naturally from the previous one
+2. **Explain WHY** code is structured this way, not just what each line does
+3. **Word count**: ~2.5 words per second (e.g., 40 sec = ~100 words)
+4. **Mermaid diagrams**: REQUIRED for architecture sections. `graph TD` or `graph LR`, 5-10 nodes max. Just diagram syntax, no markdown fences
+5. **Transitions**: Each section should flow naturally from the previous one
 
 ## Step 8: Render the video
 
@@ -177,11 +235,13 @@ cd ~/.repo2video && npx tsx render-cli.ts \
   2>&1
 ```
 
-The `--repo` flag tells the renderer where to find the actual source files for code block extraction. The renderer will:
+The `--repo` flag tells the renderer where to find source files for code block extraction. The renderer will:
 1. Read code from the repo based on your startLine/endLine references
 2. Inject your comment hints as visible annotations
-3. Generate TTS audio from your narration text (Edge TTS, free)
-4. Render animated 1080p MP4 with Remotion (syntax-highlighted code, file trees, architecture diagrams)
+3. Generate TTS audio from your narration (Edge TTS, free)
+4. Render slides with animated bullet reveals
+5. Render Mermaid diagrams for architecture sections
+6. Render animated 1080p MP4 with Remotion
 
 The final line of stdout is the path to the generated MP4.
 

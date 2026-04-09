@@ -54,17 +54,18 @@ Unlike typical AI video tools, **Claude itself** does the creative work:
 1. **Clone** — shallow clone of the target repo
 2. **Analyze** — engine detects languages, frameworks, entry points, key files
 3. **Read** — Claude reads key source files to deeply understand the codebase
-4. **Plan** — Claude designs the tutorial structure (sections, pacing, teaching order)
-5. **Script** — Claude writes narration + code annotations for each section
+4. **Plan** — Claude designs the tutorial structure (architecture first, then code)
+5. **Script** — Claude writes slide content, narration, and code annotations for each section
 6. **Audio** — Edge TTS generates spoken narration (free, no API key)
 7. **Render** — Remotion renders animated React scenes to 1080p MP4 with FFmpeg audio mux
 
 Output: a polished MP4 video tutorial with:
 - Animated intro with repo name and detected frameworks
 - File tree visualization
+- **Architecture slides** with animated bullet points explaining the project structure
+- **Mermaid diagrams** showing component relationships and data flow
 - Syntax-highlighted code walkthroughs with comment annotations
-- Architecture diagrams (Mermaid)
-- Spoken narration synced to code reveals
+- Spoken narration synced to slides and code reveals
 - Outro scene
 
 ## Environment Variables
